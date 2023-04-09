@@ -1,29 +1,62 @@
-import React from 'react'
-import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import React,{useEffect, useState} from 'react';
+import {createMaterialTopTabNavigator} from '@react-navigation/material-top-tabs';
 import SearchResultsScreen from '../screens/SearchResults';
 import SearchResultsMap from '../screens/SearchResultsMap';
-import { useRoute } from '@react-navigation/native';
+import {useRoute} from '@react-navigation/native';
 
-const Tab=createMaterialTopTabNavigator();
+import {API,graphqlOperation} from 'aws-amplify';
+import {listPosts} from '../graphql/queries';
 
- const SearchResultsTabNavigator=(props)=>{
+const Tab = createMaterialTopTabNavigator();
+
+const SearchResultsTabNavigator = props => {
+  const [posts, setPosts] = useState([]);
   
-  const route=useRoute();
-  const {guests} =route.params;
+  const route = useRoute();
+  const {guests, viewport} = route.params;
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const postsResult = await API.graphql(
+          graphqlOperation(listPosts, {
+            filter: {
+              and: {
+                maxGuests: {
+                  ge: guests,
+                },
+                latitude: {
+                  between: [viewport.southwest.lat, viewport.northeast.lat],
+                },
+                longitude: {
+                  between: [viewport.southwest.lng, viewport.northeast.lng],
+                },
+              },
+            },
+          }),
+        );
+        setPosts(postsResult.data.listPosts.items);
+      } catch (e) {
+        console.log(e);
+      }
+    };
+    fetchPosts();
+  }, []);
 
   return (
-    <Tab.Navigator screenOptions={{
-      "tabBarActiveTintColor": "#f15454",
-      "tabBarIndicatorStyle": {
-        "backgroundColor": "#f15454"
-      }
-    }}>
-        <Tab.Screen name={"list"}>
-          {()=>(<SearchResultsScreen guests={guests}/>)}
-        </Tab.Screen>
-        <Tab.Screen name={"map"}>
-          {()=>(<SearchResultsMap guests={guests}/>)}
-        </Tab.Screen>
+    <Tab.Navigator
+      screenOptions={{
+        tabBarActiveTintColor: '#f15454',
+        tabBarIndicatorStyle: {
+          backgroundColor: '#f15454',
+        },
+      }}>
+      <Tab.Screen name={'list'}>
+        {() => <SearchResultsScreen posts={posts}/>}
+      </Tab.Screen>
+      <Tab.Screen name={'map'}>
+        {() => <SearchResultsMap posts={posts} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 };
